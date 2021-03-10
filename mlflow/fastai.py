@@ -391,7 +391,7 @@ def autolog(
 
     MLflow will also log the parameters of the
     `EarlyStoppingCallback <https://docs.fast.ai/callbacks.html#EarlyStoppingCallback>`_
-    and `OneCycleScheduler <https://docs.fast.ai/callbacks.html#OneCycleScheduler>`_ callbacks
+    and `ParamScheduler <https://docs.fast.ai/callbacks.html#ParamScheduler>`_ callbacks
 
     :param log_models: If ``True``, trained models are logged as MLflow model artifacts.
                        If ``False``, trained models are not logged.
@@ -470,12 +470,14 @@ def autolog(
 
         Fastai autologged MLflow entities
     """
-    from fastai.basic_train import LearnerCallback, Learner
-    from fastai.callbacks.hooks import model_summary, layers_info
-    from fastai.callbacks import EarlyStoppingCallback, OneCycleScheduler
+    from fastai.learner import Learner
+    from fastai.callback.core import Callback
+    from fastai.callback.hook import module_summary, layer_info
+    from fastai.callback.tracker import EarlyStoppingCallback
+    from fastai.callback.schedule import ParamScheduler as OneCycleScheduler
 
     def getFastaiCallback(metrics_logger, learner):
-        class __MLflowFastaiCallback(LearnerCallback, metaclass=ExceptionSafeClass):
+        class __MLflowFastaiCallback(Callback, metaclass=ExceptionSafeClass):
             """
             Callback for auto-logging metrics and parameters.
             Records model structural information as params when training begins
@@ -570,7 +572,7 @@ def autolog(
     def _run_and_log_function(self, original, args, kwargs, unlogged_params, callback_arg_index):
         log_fn_args_as_params(original, list(args), kwargs, unlogged_params)
 
-        callbacks = [cb(self) for cb in self.callback_fns] + (self.callbacks or [])
+        callbacks = [cb(self) for cb in self.cbs] + (self.callbacks or [])
 
         run_id = mlflow.active_run().info.run_id
         with batch_metrics_logger(run_id) as metrics_logger:
@@ -589,7 +591,7 @@ def autolog(
                 kwargs["callbacks"] = [mlflowFastaiCallback]
 
             early_stop_callback = _find_callback_of_type(EarlyStoppingCallback, callbacks)
-            one_cycle_callback = _find_callback_of_type(OneCycleScheduler, callbacks)
+            one_cycle_callback = _find_callback_of_type(ParamScheduler, callbacks)
 
             _log_early_stop_callback_params(early_stop_callback)
             _log_one_cycle_callback_params(one_cycle_callback)
